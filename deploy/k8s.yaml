@@ -2,6 +2,7 @@
 # Namespace: lurus-system
 # Domain: newapi.lurus.cn
 # Source: https://github.com/QuantumNous/new-api
+# Node: office-debian-2 (proxy enabled for Gemini access)
 
 ---
 # Redis Deployment (shared cache for lurus-system)
@@ -22,6 +23,9 @@ spec:
       labels:
         app: redis
     spec:
+      # Schedule on proxy-enabled node for network access
+      nodeSelector:
+        kubernetes.io/hostname: office-debian-2
       containers:
         - name: redis
           image: redis:7-alpine
@@ -54,6 +58,9 @@ spec:
 
 ---
 # Secret for database credentials
+# NOTE: Using ClusterIP addresses because office-debian-2 has DNS resolution issues
+# PostgreSQL ClusterIP: 10.43.9.14 (lurus-pg-rw.database.svc)
+# Redis ClusterIP: 10.43.90.36 (redis.lurus-system.svc)
 apiVersion: v1
 kind: Secret
 metadata:
@@ -63,10 +70,10 @@ metadata:
     app: lurus-newapi
 type: Opaque
 stringData:
-  # PostgreSQL connection string
-  SQL_DSN: "postgresql://lurus:LurusOps2026@lurus-pg-rw.database.svc:5432/newapi?sslmode=disable"
-  # Redis connection string (shared redis in lurus-system)
-  REDIS_CONN_STRING: "redis://redis.lurus-system.svc:6379/0"
+  # PostgreSQL connection (using ClusterIP due to DNS issues on office-debian-2)
+  SQL_DSN: "postgresql://lurus:LurusOps2026@10.43.9.14:5432/newapi?sslmode=disable"
+  # Redis connection (using ClusterIP due to DNS issues on office-debian-2)
+  REDIS_CONN_STRING: "redis://10.43.90.36:6379/0"
   # Session secret - random string for session encryption
   SESSION_SECRET: "lurus-newapi-session-secret-2026"
 
@@ -106,6 +113,9 @@ spec:
       labels:
         app: lurus-newapi
     spec:
+      # Schedule on proxy-enabled node for Gemini API access
+      nodeSelector:
+        kubernetes.io/hostname: office-debian-2
       containers:
         - name: lurus-newapi
           image: calciumion/new-api:latest
