@@ -27,3 +27,6 @@ data/
 .gomodcache/
 .gocache-temp
 .gopath
+
+# BMAD framework (lives at root only)
+_bmad/
