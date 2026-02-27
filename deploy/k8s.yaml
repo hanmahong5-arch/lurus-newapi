@@ -113,15 +113,14 @@ spec:
         fsGroup: 65534
       containers:
         - name: lurus-newapi
-          # TODO: Pin to specific version when QuantumNous/new-api publishes tagged releases.
-          # Check https://hub.docker.com/r/calciumion/new-api/tags for available versions.
-          image: calciumion/new-api:latest
+          # Pinned to stable release. Check https://hub.docker.com/r/calciumion/new-api/tags
+          image: calciumion/new-api:v0.10.9
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           args:
             - --log-dir
             - /app/logs
@@ -241,9 +240,9 @@ spec:
       kind: Rule
       middlewares:
         - name: global-ratelimit
-          namespace: kube-system
+          namespace: lurus-system
         - name: circuit-breaker
-          namespace: kube-system
+          namespace: lurus-system
       services:
         - name: lurus-newapi
           port: 3000
