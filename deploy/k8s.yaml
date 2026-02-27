@@ -107,9 +107,20 @@ spec:
       # Schedule on proxy-enabled node for Gemini API access
       nodeSelector:
         lurus.cn/vpn: "true"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
       containers:
         - name: lurus-newapi
+          # TODO: Pin to specific version when QuantumNous/new-api publishes tagged releases.
+          # Check https://hub.docker.com/r/calciumion/new-api/tags for available versions.
           image: calciumion/new-api:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
           imagePullPolicy: Always
           args:
             - --log-dir
@@ -163,6 +174,8 @@ spec:
               mountPath: /data
             - name: logs
               mountPath: /app/logs
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               memory: "256Mi"
@@ -189,6 +202,8 @@ spec:
           persistentVolumeClaim:
             claimName: lurus-newapi-data
         - name: logs
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
 
 ---
@@ -224,8 +239,13 @@ spec:
   routes:
     - match: Host(`newapi.lurus.cn`)
       kind: Rule
+      middlewares:
+        - name: global-ratelimit
+          namespace: kube-system
+        - name: circuit-breaker
+          namespace: kube-system
       services:
         - name: lurus-newapi
           port: 3000
   tls:
-    certResolver: letsencrypt
+    secretName: lurus-cn-wildcard-tls
