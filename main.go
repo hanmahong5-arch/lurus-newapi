@@ -28,6 +28,7 @@ import (
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
+	redisSession "github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
@@ -165,15 +166,39 @@ func main() {
 	server.Use(middleware.PoweredBy())
 	server.Use(middleware.I18n())
 	middleware.SetUpLogger(server)
-	// Initialize session store
-	store := cookie.NewStore([]byte(common.SessionSecret))
-	store.Options(sessions.Options{
-		Path:     "/",
-		MaxAge:   2592000, // 30 days
-		HttpOnly: true,
-		Secure:   false,
-		SameSite: http.SameSiteStrictMode,
-	})
+	// Initialize session store: Redis (server-side) when available, cookie fallback for dev.
+	var store sessions.Store
+	if common.RedisEnabled {
+		opt := common.ParseRedisOption()
+		redisStore, err := redisSession.NewStoreWithDB(
+			10, "tcp", opt.Addr, opt.Password, strconv.Itoa(opt.DB),
+			[]byte(common.SessionSecret),
+		)
+		if err != nil {
+			common.FatalLog("failed to create Redis session store: " + err.Error())
+			return
+		}
+		redisStore.Options(sessions.Options{
+			Path:     "/",
+			MaxAge:   2592000, // 30 days
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+		})
+		store = redisStore
+		common.SysLog("Session store: Redis (" + opt.Addr + ")")
+	} else {
+		cookieStore := cookie.NewStore([]byte(common.SessionSecret))
+		cookieStore.Options(sessions.Options{
+			Path:     "/",
+			MaxAge:   2592000, // 30 days
+			HttpOnly: true,
+			Secure:   false,
+			SameSite: http.SameSiteLaxMode,
+		})
+		store = cookieStore
+		common.SysLog("Session store: Cookie (dev mode)")
+	}
 	server.Use(sessions.Sessions("session", store))
 
 	InjectUmamiAnalytics()

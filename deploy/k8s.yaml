@@ -113,8 +113,8 @@ spec:
         fsGroup: 65534
       containers:
         - name: lurus-newapi
-          # Pinned to stable release. Check https://hub.docker.com/r/calciumion/new-api/tags
-          image: calciumion/new-api:v0.10.9
+          # Built from this fork (ghcr.io/hanmahong5-arch/lurus-newapi)
+          image: ghcr.io/hanmahong5-arch/lurus-newapi:main
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
