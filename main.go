@@ -182,7 +182,7 @@ func main() {
 			Path:     "/",
 			MaxAge:   2592000, // 30 days
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   false,
 			SameSite: http.SameSiteLaxMode,
 		})
 		store = redisStore
@@ -199,7 +199,9 @@ func main() {
 		store = cookieStore
 		common.SysLog("Session store: Cookie (dev mode)")
 	}
-	server.Use(sessions.Sessions("session", store))
+	// Use a distinct cookie name to avoid conflicts with stale "session" cookies
+	// from previous deployments (cookie-store format vs redistore format).
+	server.Use(sessions.Sessions("lurus-session", store))
 
 	InjectUmamiAnalytics()
 	InjectGoogleAnalytics()
