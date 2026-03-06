@@ -133,6 +133,10 @@ ssh root@100.98.57.55 "kubectl apply -f -" < deploy/k8s.yaml
 
 | Resource | Path |
 |----------|------|
+| PRD | `./_bmad-output/planning-artifacts/prd.md` |
+| Epics | `./_bmad-output/planning-artifacts/epics.md` |
 | Architecture | `./_bmad-output/planning-artifacts/architecture.md` |
-| Product Brief | `./_bmad-output/product-brief.md` |
-| Project Context | `./_bmad-output/project-context.md` |
+| Product Brief | `./_bmad-output/planning-artifacts/product-brief.md` |
+| Project Context | `./_bmad-output/planning-artifacts/project-context.md` |
+| Sprint Status | `./_bmad-output/implementation-artifacts/sprint-status.yaml` |
+| Dev Stories | `./_bmad-output/implementation-artifacts/<story-id>.md` |
