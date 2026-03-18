@@ -22,7 +22,7 @@ sectionsAdded: ['8-implementation-patterns', '9-project-structure-boundaries']
 │                                                                         │
 │  ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐  ┌───────────┐ │
 │  │lurus-api│  │lurus-    │  │lurus-    │  │lurus-   │  │lurus-     │ │
-│  │(Gateway)│  │gushen    │  │webmail   │  │newapi   │  │switch     │ │
+│  │(Gateway)│  │lucrum    │  │webmail   │  │newapi   │  │switch     │ │
 │  │         │  │(Quant)   │  │(Mail)    │  │(LLM Mgr)│  │(Desktop)  │ │
 │  └────┬────┘  └────┬─────┘  └────┬─────┘  └────┬────┘  └───────────┘ │
 │       │            │             │              │                       │
@@ -369,7 +369,7 @@ PostgreSQL (CNPG Cluster)
 │   ├── tenants            # Multi-tenant (planned)
 │   └── ...
 │
-├── gushen schema
+├── lucrum schema
 │   ├── users              # NextAuth.js compatible
 │   ├── userPreferences    # User settings & defaults
 │   ├── userDrafts         # Auto-saved draft recovery
@@ -404,7 +404,7 @@ Redis
 │   ├── ratelimit:*        # API rate limiting
 │   └── cache:model:*      # Model availability cache
 │
-├── db:1 (gushen - production)
+├── db:1 (lucrum - production)
 │   ├── kline:*            # K-line data cache (1hr TTL)
 │   ├── backtest:*         # Backtest result cache (hash key)
 │   ├── stock:list         # Stock list cache
@@ -414,7 +414,7 @@ Redis
 ├── db:2 (rate limiting)
 │   └── rl:*               # Global rate limits
 │
-└── db:3 (gushen - staging)
+└── db:3 (lucrum - staging)
     └── (mirrors db:1 structure, isolated data)
 ```
 
@@ -427,12 +427,12 @@ NATS JetStream
 │   ├── llm.response.*     # API response events
 │   └── llm.error.*        # Error events
 │
-└── GUSHEN_EVENTS stream
-    ├── gushen.backtest.*   # Backtest execution events
-    ├── gushen.strategy.*   # Strategy CRUD events
-    ├── gushen.workflow.*   # Workflow step events
-    ├── gushen.crawler.*    # Crawler discovery events
-    └── gushen.market.*     # Market data events
+└── LUCRUM_EVENTS stream
+    ├── lucrum.backtest.*   # Backtest execution events
+    ├── lucrum.strategy.*   # Strategy CRUD events
+    ├── lucrum.workflow.*   # Workflow step events
+    ├── lucrum.crawler.*    # Crawler discovery events
+    └── lucrum.market.*     # Market data events
 ```
 
 ---
@@ -448,7 +448,7 @@ User → Zitadel (OIDC) → JWT Token → Service API
                                    JWT signature & claims
 ```
 
-Gushen-specific: NextAuth.js with email/password + session-based auth.
+Lucrum-specific: NextAuth.js with email/password + session-based auth.
 
 ### 4.2 Network Security
 
@@ -504,13 +504,13 @@ Gushen-specific: NextAuth.js with email/password + session-based auth.
 | Master RAM (32GB) | All control plane + services + staging | ~65% | Medium |
 | DB CPU (4C) | PostgreSQL + Zitadel | ~30% | Low |
 | DB Storage | ~50GB | ~25% of available | Low |
-| Worker CPU (2C) | gushen-web + www + docs | ~70% | **High** |
+| Worker CPU (2C) | lucrum-web + www + docs | ~70% | **High** |
 | Worker RAM (2GB) | Next.js + Vue + VitePress | ~80% | **High** |
 
 ### Scaling Strategy / 扩展策略
 
 1. **Short-term**: Staging already moved to master (has headroom); monitor worker closely
-2. **Medium-term**: Add another cloud worker node (2-4C) for gushen-web production
+2. **Medium-term**: Add another cloud worker node (2-4C) for lucrum-web production
 3. **Long-term**: Consider managed PostgreSQL if data grows significantly
 
 ---
@@ -631,7 +631,7 @@ Gushen-specific: NextAuth.js with email/password + session-based auth.
 #### TypeScript (Next.js) Structure (Binding)
 
 ```
-gushen-web/
+lucrum-web/
 ├── src/
 │   ├── app/
 │   │   ├── api/<resource>/route.ts     # API routes
@@ -707,8 +707,8 @@ gushen-web/
 
 | Service | Prefix | Format | Example |
 |---------|--------|--------|---------|
-| gushen-web (backtest) | `BT` | `BT<category><detail>` | `BT100` (validation), `BT200` (data), `BT300` (calc) |
-| gushen-web (other) | `GS` | `GS<category><detail>` | `GS100`, `GS200` |
+| lucrum-web (backtest) | `BT` | `BT<category><detail>` | `BT100` (validation), `BT200` (data), `BT300` (calc) |
+| lucrum-web (other) | `GS` | `GS<category><detail>` | `GS100`, `GS200` |
 | lurus-api | `domain:code` | `<domain>:<detail>` | `channel:invalid_key` |
 
 **Rule**: Error codes MUST be unique within their service. Each service owns its error code namespace. Error messages MUST be bilingual (zh + en) with actionable `suggestion` field.
@@ -722,8 +722,8 @@ All NATS JetStream events use this standard envelope:
 ```json
 {
   "id": "uuid-v4",
-  "type": "gushen.backtest.completed",
-  "source": "gushen-web",
+  "type": "lucrum.backtest.completed",
+  "source": "lucrum-web",
   "time": "2026-02-03T10:00:00Z",
   "data": { }
 }
@@ -836,10 +836,10 @@ interface AsyncState {
 
 ## 9. Project Structure & Boundaries / 项目结构与边界
 
-### 9.1 gushen-web Complete Directory Structure
+### 9.1 lucrum-web Complete Directory Structure
 
 ```
-gushen-web/
+lucrum-web/
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx                          # Root layout (providers, fonts)
@@ -1149,13 +1149,13 @@ lib/stores/     → CAN import from: lib/types/
 
 | Boundary | Communication | Protocol |
 |----------|--------------|----------|
-| gushen-web → lurus-api | HTTP proxy (`/api/backend/[...path]`) | REST, API key auth |
-| gushen-web → PostgreSQL | Direct (Drizzle ORM, `gushen` schema ONLY) | TCP, connection pool |
-| gushen-web → Redis | Direct (`db:1` production, `db:3` staging) | TCP |
-| gushen-web → External APIs | HTTP client (data-service layer) | HTTPS, rate-limited |
-| gushen-web → NATS | Publish events (future) | NATS protocol |
+| lucrum-web → lurus-api | HTTP proxy (`/api/backend/[...path]`) | REST, API key auth |
+| lucrum-web → PostgreSQL | Direct (Drizzle ORM, `lucrum` schema ONLY) | TCP, connection pool |
+| lucrum-web → Redis | Direct (`db:1` production, `db:3` staging) | TCP |
+| lucrum-web → External APIs | HTTP client (data-service layer) | HTTPS, rate-limited |
+| lucrum-web → NATS | Publish events (future) | NATS protocol |
 
-**Schema Isolation Rule**: gushen-web MUST only access `gushen` schema. Cross-schema queries to `lurus_api`, `identity`, or `webmail` are FORBIDDEN. Use the `/api/backend/` proxy for lurus-api data.
+**Schema Isolation Rule**: lucrum-web MUST only access `lucrum` schema. Cross-schema queries to `lurus_api`, `identity`, or `webmail` are FORBIDDEN. Use the `/api/backend/` proxy for lurus-api data.
 
 ### 9.5 Data Flow / 数据流
 
@@ -1169,7 +1169,7 @@ API Route (/api/backtest)
 Business Logic (lib/backtest/engine.ts)
     ↓ requests K-line data
 Data Layer (lib/backtest/db-kline-provider.ts)
-    ├─→ PostgreSQL (gushen.kline_daily) ──→ HIT: return data
+    ├─→ PostgreSQL (lucrum.kline_daily) ──→ HIT: return data
     ├─→ Eastmoney API (fallback) ──→ HIT: return + persist to DB
     ├─→ Sina API (second fallback)
     └─→ Mock generator (last resort, clearly labeled)
