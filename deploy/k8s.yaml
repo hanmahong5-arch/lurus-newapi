@@ -182,6 +182,14 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "1000m"
+          startupProbe:
+            httpGet:
+              path: /api/status
+              port: 3000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 12
+            timeoutSeconds: 3
           livenessProbe:
             httpGet:
               path: /api/status
