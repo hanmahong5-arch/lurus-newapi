@@ -249,8 +249,10 @@ spec:
       middlewares:
         - name: global-ratelimit
           namespace: lurus-system
-        - name: circuit-breaker
-          namespace: lurus-system
+        # circuit-breaker removed: newapi is an LLM gateway — upstream 5xx is normal
+        # (different providers/channels have different availability). The breaker was
+        # causing cascading failures: upstream 503 during generation → breaker trips →
+        # all subsequent requests (including video downloads) get 503 from Traefik.
       services:
         - name: lurus-newapi
           port: 3000
