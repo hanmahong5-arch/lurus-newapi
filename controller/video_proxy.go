@@ -44,6 +44,13 @@ func VideoProxy(c *gin.Context) {
 		return
 	}
 
+	// Verify ownership: the requesting user must own the task
+	userId := c.GetInt("id")
+	if task.UserId != userId {
+		c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
+		return
+	}
+
 	if task.Status != model.TaskStatusSuccess {
 		videoProxyError(c, http.StatusBadRequest, "invalid_request_error",
 			fmt.Sprintf("Task is not completed yet, current status: %s", task.Status))
