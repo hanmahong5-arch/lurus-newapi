@@ -114,7 +114,7 @@ spec:
       containers:
         - name: lurus-newapi
           # Built from this fork (ghcr.io/hanmahong5-arch/lurus-newapi)
-          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-20260228-0a8a7a6
+          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-da3cb48
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -186,9 +186,9 @@ spec:
             httpGet:
               path: /api/status
               port: 3000
-            initialDelaySeconds: 3
+            initialDelaySeconds: 5
             periodSeconds: 5
-            failureThreshold: 12
+            failureThreshold: 60
             timeoutSeconds: 3
           livenessProbe:
             httpGet:
