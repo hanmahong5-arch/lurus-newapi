@@ -315,6 +315,13 @@ func InitResources() error {
 		return err
 	}
 
+	// Initialize NATS event publisher (no-op if NATS_URL unset).
+	// Failure to connect is logged but not fatal: missing NATS only disables
+	// the unified inbox feature; core LLM relay must still function.
+	if err := service.InitNATSPublisher(); err != nil {
+		common.SysError("failed to initialize NATS publisher: " + err.Error())
+	}
+
 	// 启动系统监控
 	common.StartSystemMonitor()
 

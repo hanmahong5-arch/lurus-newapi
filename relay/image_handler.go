@@ -138,5 +138,13 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	}
 
 	postConsumeQuota(c, info, usage.(*dto.Usage), logContent...)
+
+	// Notify the platform unified inbox that an image generation finished.
+	// Fire-and-forget: we do not surface NATS errors to the user. The image
+	// URL is not parsed here (each provider's response shape differs and we
+	// don't want to re-decode the streamed body); the consumer-side template
+	// can render the prompt + model and the user can re-find the image via
+	// their generation history.
+	service.PublishImageGenerated(c.Request.Context(), info.UserId, info.OriginModelName, request.Prompt, "")
 	return nil
 }
