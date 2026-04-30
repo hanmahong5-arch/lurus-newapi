@@ -128,6 +128,12 @@ func SetApiRouter(router *gin.Engine) {
 				// Admin 2FA routes
 				adminRoute.GET("/2fa/stats", controller.Admin2FAStats)
 				adminRoute.DELETE("/:id/2fa", controller.AdminDisable2FA)
+
+				// Admin-side per-user API-key provisioning. Idempotent on
+				// (user_id, name); used by the Lurus platform's newapi_sync
+				// module (see ADR step 4e). Local Lurus extension — not in
+				// upstream QuantumNous/new-api.
+				adminRoute.POST("/:id/api-key", controller.AdminUpsertUserAPIKey)
 			}
 		}
 
