@@ -114,7 +114,7 @@ spec:
       containers:
         - name: lurus-newapi
           # Built from this fork (ghcr.io/hanmahong5-arch/lurus-newapi)
-          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-da3cb48
+          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-427ab9d
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
