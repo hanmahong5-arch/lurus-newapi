@@ -511,6 +511,10 @@ func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQu
 		}
 	}
 
+	if relayInfo != nil && relayInfo.UserId > 0 && quota > 0 {
+		RecordCostSpikeWindow(relayInfo.UserId, quota)
+	}
+
 	return nil
 }
 
