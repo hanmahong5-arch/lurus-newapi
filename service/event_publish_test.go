@@ -217,6 +217,34 @@ func TestNoopPublisher_AlwaysSucceeds(t *testing.T) {
 	}
 }
 
+func TestPublishImageGenerated_ImageURLBackfilledFromExtractor(t *testing.T) {
+	// End-to-end: simulate ImageHelper's wrapper-then-extract flow and verify
+	// the extracted URL ends up on the wire envelope payload.image_url.
+	fp := withFakePublisher(t)
+
+	captured := []byte(`{"created":1700000000,"data":[{"url":"https://cdn.example/end2end.png"}]}`)
+	url := ExtractImageURL(captured)
+
+	PublishImageGenerated(context.Background(), 11, "dall-e-3", "a cat in a hat", url)
+
+	calls := fp.snapshot()
+	if len(calls) != 1 {
+		t.Fatalf("want 1 call, got %d", len(calls))
+	}
+	raw, _ := json.Marshal(calls[0].Payload)
+	var env struct {
+		Payload struct {
+			ImageURL string `json:"image_url"`
+		} `json:"payload"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if env.Payload.ImageURL != "https://cdn.example/end2end.png" {
+		t.Errorf("image_url=%q, want backfilled URL", env.Payload.ImageURL)
+	}
+}
+
 func TestTruncatePromptForEvent_RuneSafe(t *testing.T) {
 	// Input is multi-byte UTF-8 ("一" = 3 bytes). truncatePromptForEvent must
 	// not slice inside a rune.

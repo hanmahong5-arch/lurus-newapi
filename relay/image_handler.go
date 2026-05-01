@@ -23,6 +23,16 @@ import (
 func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
 	info.InitChannelMeta(c)
 
+	// Tee response bytes through a capped buffer so we can extract the upstream
+	// image URL after adaptors stream their JSON back to the client. The bytes
+	// the user sees remain byte-identical; only an in-memory mirror (≤64 KiB)
+	// is retained for post-flight parsing. Restored on return so we never
+	// leave a wrapped writer on c if a later middleware also writes.
+	captured := service.NewBufferedResponseWriter(c.Writer, service.CapturedBodyMaxBytes)
+	originalWriter := c.Writer
+	c.Writer = captured
+	defer func() { c.Writer = originalWriter }()
+
 	imageReq, ok := info.Request.(*dto.ImageRequest)
 	if !ok {
 		return types.NewErrorWithStatusCode(fmt.Errorf("invalid request type, expected dto.ImageRequest, got %T", info.Request), types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
@@ -140,11 +150,13 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	postConsumeQuota(c, info, usage.(*dto.Usage), logContent...)
 
 	// Notify the platform unified inbox that an image generation finished.
-	// Fire-and-forget: we do not surface NATS errors to the user. The image
-	// URL is not parsed here (each provider's response shape differs and we
-	// don't want to re-decode the streamed body); the consumer-side template
-	// can render the prompt + model and the user can re-find the image via
-	// their generation history.
-	service.PublishImageGenerated(c.Request.Context(), info.UserId, info.OriginModelName, request.Prompt, "")
+	// Fire-and-forget: we do not surface NATS errors to the user. ImageURL is
+	// extracted from the captured response body — adaptors normalize provider
+	// output to OpenAI-shape `{"data":[{"url":...}]}` before writing, so the
+	// extractor finds the URL for OpenAI/DALL-E, Replicate, Ali, Jimeng,
+	// Gemini, and Zhipu uniformly. On parse miss / cap-truncated body the
+	// URL is "" and the consumer falls back to prompt+model rendering.
+	imageURL := service.ExtractImageURL(captured.Bytes())
+	service.PublishImageGenerated(c.Request.Context(), info.UserId, info.OriginModelName, request.Prompt, imageURL)
 	return nil
 }
