@@ -155,16 +155,13 @@ spec:
               value: "300"
             - name: RELAY_TIMEOUT
               value: "300"
-            # LLM event publishers (image.generated / usage.milestone) are
-            # compiled in but DORMANT until a NATS broker reachable from
-            # this pod exists. R1 has nats.messaging.svc but R6 (where the
-            # notification consumer runs) has none — the cross-cluster
-            # bridge isn't built yet. Once leaf-node bridging is set up
-            # OR the consumer migrates to R1, set NATS_URL to activate.
-            # Empty / unset = publisher is a clean no-op (no connect-fail
-            # log spam, no user-path impact).
-            # - name: NATS_URL
-            #   value: "nats://nats.messaging.svc:4222"
+            # Activates the LLM event publishers (image.generated /
+            # usage.milestone). R1 newapi → R1 nats.messaging.svc (in-
+            # cluster) → bridged to the R6 notification consumer via the
+            # lurus-nats-bridge.service running on office-debian-2 host
+            # (socat 100.120.110.73:14222 → 10.43.173.181:4222 cluster IP).
+            - name: NATS_URL
+              value: "nats://nats.messaging.svc:4222"
             # Outbound proxy for external LLM API access (Gemini, etc.)
             - name: HTTP_PROXY
               value: "http://10.42.1.1:10808"
