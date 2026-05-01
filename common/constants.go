@@ -181,6 +181,12 @@ var (
 	SearchRateLimitDuration int64 = 60
 )
 
+// Cost-spike protection: sliding 5-minute window per user.
+var (
+	CostSpikeProtectionEnabled  = true
+	CostSpikeHardLimitPer5Min   = 50000 // quota units (~0.1 USD/5min at free-tier ratios)
+)
+
 var RateLimitKeyExpirationDuration = 20 * time.Minute
 
 const (

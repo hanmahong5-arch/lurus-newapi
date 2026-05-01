@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -21,6 +22,7 @@ import (
 	"github.com/bytedance/gopkg/util/gopool"
 
 	"github.com/gin-gonic/gin"
+	goredis "github.com/go-redis/redis/v8"
 	"github.com/shopspring/decimal"
 )
 
@@ -558,6 +560,25 @@ func checkAndSendQuotaNotify(relayInfo *relaycommon.RelayInfo, quota int, preCon
 			}
 		}
 	})
+}
+
+// RecordCostSpikeWindow appends token usage to the per-user 5-minute sliding
+// window in Redis. Called after successful quota consumption. No-op when Redis
+// is unavailable or cost-spike protection is disabled.
+func RecordCostSpikeWindow(userID, tokens int) {
+	if !common.CostSpikeProtectionEnabled || !common.RedisEnabled || tokens <= 0 {
+		return
+	}
+	ctx := context.Background()
+	now := time.Now().UnixMilli()
+	key := fmt.Sprintf("cost_spike:user:%d", userID)
+	member := fmt.Sprintf("%d:%d", now, tokens)
+	pipe := common.RDB.Pipeline()
+	pipe.ZAdd(ctx, key, &goredis.Z{Score: float64(now), Member: member})
+	pipe.Expire(ctx, key, 600*time.Second)
+	if _, err := pipe.Exec(ctx); err != nil {
+		common.SysLog(fmt.Sprintf("cost_spike record failed for user %d: %s", userID, err.Error()))
+	}
 }
 
 func checkAndSendSubscriptionQuotaNotify(relayInfo *relaycommon.RelayInfo) {

@@ -1037,3 +1037,12 @@ func RootUserExists() bool {
 	}
 	return true
 }
+
+// DisableUserByID sets the user's status to disabled.
+// Used by cost-spike protection to auto-disable looping users.
+func DisableUserByID(id int) error {
+	if id == 0 {
+		return errors.New("user id is zero")
+	}
+	return DB.Model(&User{}).Where("id = ?", id).Update("status", common.UserStatusDisabled).Error
+}
