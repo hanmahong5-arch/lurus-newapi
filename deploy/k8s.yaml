@@ -114,7 +114,7 @@ spec:
       containers:
         - name: lurus-newapi
           # Built from this fork (ghcr.io/hanmahong5-arch/lurus-newapi)
-          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-427ab9d
+          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-9ef4e6d
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -155,6 +155,12 @@ spec:
               value: "300"
             - name: RELAY_TIMEOUT
               value: "300"
+            # Wires the LLM event publishers (image.generated /
+            # usage.milestone) into the platform notification consumer.
+            # Empty / unset = publisher is no-op so this is the activation
+            # switch — set to nats.messaging.svc cluster name.
+            - name: NATS_URL
+              value: "nats://nats.messaging.svc:4222"
             # Outbound proxy for external LLM API access (Gemini, etc.)
             - name: HTTP_PROXY
               value: "http://10.42.1.1:10808"
