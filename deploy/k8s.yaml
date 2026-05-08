@@ -113,8 +113,12 @@ spec:
         fsGroup: 65534
       containers:
         - name: lurus-newapi
-          # Built from this fork (ghcr.io/hanmahong5-arch/lurus-newapi)
-          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-fc49e72
+          # Switched to vanilla upstream QuantumNous/new-api v1.0.0-rc.4 —
+          # local fork features dropped (admin api-key endpoint, NATS event
+          # publishers, lurus-session cookie, timing-safe auth). Schema
+          # auto-migrates cleanly against existing R1 data (verified locally).
+          # Rollback tag: ghcr.io/hanmahong5-arch/lurus-newapi:main-fc49e72
+          image: calciumion/new-api:v1.0.0-rc.4
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
