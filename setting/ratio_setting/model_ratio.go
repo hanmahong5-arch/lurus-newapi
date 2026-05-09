@@ -146,6 +146,12 @@ var defaultModelRatio = map[string]float64{
 	"claude-opus-4-6-high":                      2.5,
 	"claude-opus-4-6-medium":                    2.5,
 	"claude-opus-4-6-low":                       2.5,
+	"claude-opus-4-7":                           2.5,
+	"claude-opus-4-7-max":                       2.5,
+	"claude-opus-4-7-xhigh":                     2.5,
+	"claude-opus-4-7-high":                      2.5,
+	"claude-opus-4-7-medium":                    2.5,
+	"claude-opus-4-7-low":                       2.5,
 	"claude-3-opus-20240229":                    7.5, // $15 / 1M tokens
 	"claude-opus-4-20250514":                    7.5,
 	"claude-opus-4-1-20250805":                  7.5,
@@ -184,10 +190,6 @@ var defaultModelRatio = map[string]float64{
 	"gemini-2.5-flash-lite-preview-06-17":       0.05,
 	"gemini-2.5-flash":                          0.15,
 	"gemini-robotics-er-1.5-preview":            0.15,
-	"gemini-3-flash-preview":                    0.25,  // $0.50/M input, $3.00/M output
-	"gemini-3.1-pro-preview":                    1.0,   // $2.00/M input, $12.00/M output
-	"gemini-3.1-flash-lite-preview":             0.125, // $0.25/M input, $1.50/M output
-	"gemini-3.1-flash-image-preview":            0.125, // Nano Banana 2, same tier as flash-lite
 	"gemini-embedding-001":                      0.075,
 	"text-embedding-004":                        0.001,
 	"chatglm_turbo":                             0.3572,     // ￥0.005 / 1k tokens
@@ -302,6 +304,10 @@ var defaultModelPrice = map[string]float64{
 	"sora-2":                         0.3,
 	"sora-2-pro":                     0.5,
 	"gpt-4o-mini-tts":                0.3,
+	"veo-3.0-generate-001":           0.4,
+	"veo-3.0-fast-generate-001":      0.15,
+	"veo-3.1-generate-preview":       0.4,
+	"veo-3.1-fast-generate-preview":  0.15,
 }
 
 var defaultAudioRatio = map[string]float64{
@@ -361,6 +367,10 @@ func UpdateModelPriceByJSONString(jsonStr string) error {
 func GetModelPrice(name string, printErr bool) (float64, bool) {
 	name = FormatMatchingModelName(name)
 
+	if price, ok := modelPriceMap.Get(name); ok {
+		return price, true
+	}
+
 	if strings.HasSuffix(name, CompactModelSuffix) {
 		price, ok := modelPriceMap.Get(CompactWildcardModelKey)
 		if !ok {
@@ -372,14 +382,10 @@ func GetModelPrice(name string, printErr bool) (float64, bool) {
 		return price, true
 	}
 
-	price, ok := modelPriceMap.Get(name)
-	if !ok {
-		if printErr {
-			common.SysError("model price not found: " + name)
-		}
-		return -1, false
+	if printErr {
+		common.SysError("model price not found: " + name)
 	}
-	return price, true
+	return -1, false
 }
 
 func UpdateModelRatioByJSONString(jsonStr string) error {
@@ -452,6 +458,44 @@ func GetCompletionRatio(name string) float64 {
 	return hardCodedRatio
 }
 
+type CompletionRatioInfo struct {
+	Ratio  float64 `json:"ratio"`
+	Locked bool    `json:"locked"`
+}
+
+func GetCompletionRatioInfo(name string) CompletionRatioInfo {
+	name = FormatMatchingModelName(name)
+
+	if strings.Contains(name, "/") {
+		if ratio, ok := completionRatioMap.Get(name); ok {
+			return CompletionRatioInfo{
+				Ratio:  ratio,
+				Locked: false,
+			}
+		}
+	}
+
+	hardCodedRatio, locked := getHardcodedCompletionModelRatio(name)
+	if locked {
+		return CompletionRatioInfo{
+			Ratio:  hardCodedRatio,
+			Locked: true,
+		}
+	}
+
+	if ratio, ok := completionRatioMap.Get(name); ok {
+		return CompletionRatioInfo{
+			Ratio:  ratio,
+			Locked: false,
+		}
+	}
+
+	return CompletionRatioInfo{
+		Ratio:  hardCodedRatio,
+		Locked: false,
+	}
+}
+
 func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 
 	isReservedModel := strings.HasSuffix(name, "-all") || strings.HasSuffix(name, "-gizmo-*")
@@ -471,6 +515,15 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 		}
 		// gpt-5 匹配
 		if strings.HasPrefix(name, "gpt-5") {
+			if strings.HasPrefix(name, "gpt-5.5") {
+				return 6, true
+			}
+			if strings.HasPrefix(name, "gpt-5.4") {
+				if strings.HasPrefix(name, "gpt-5.4-nano") {
+					return 6.25, true
+				}
+				return 6, true
+			}
 			return 8, true
 		}
 		// gpt-4.5-preview匹配
@@ -530,12 +583,6 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 			return 2.5 / 0.3, false
 		} else if strings.HasPrefix(name, "gemini-robotics-er-1.5") {
 			return 2.5 / 0.3, false
-		} else if strings.HasPrefix(name, "gemini-3.1-pro") {
-			return 6, false // $2.00/$12.00 per 1M tokens = 1:6 ratio
-		} else if strings.HasPrefix(name, "gemini-3.1-flash") {
-			return 6, false // $0.25/$1.50 per 1M tokens = 1:6 ratio
-		} else if strings.HasPrefix(name, "gemini-3-flash") {
-			return 6, false // $0.50/$3.00 per 1M tokens = 1:6 ratio
 		} else if strings.HasPrefix(name, "gemini-3-pro") {
 			if strings.HasPrefix(name, "gemini-3-pro-image") {
 				return 60, false
@@ -660,6 +707,18 @@ func GetModelPriceCopy() map[string]float64 {
 
 func GetCompletionRatioCopy() map[string]float64 {
 	return completionRatioMap.ReadAll()
+}
+
+func GetImageRatioCopy() map[string]float64 {
+	return imageRatioMap.ReadAll()
+}
+
+func GetAudioRatioCopy() map[string]float64 {
+	return audioRatioMap.ReadAll()
+}
+
+func GetAudioCompletionRatioCopy() map[string]float64 {
+	return audioCompletionRatioMap.ReadAll()
 }
 
 // 转换模型名，减少渠道必须配置各种带参数模型

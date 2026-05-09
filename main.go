@@ -19,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/oauth"
+	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/relay"
 	"github.com/QuantumNous/new-api/router"
 	"github.com/QuantumNous/new-api/service"
@@ -28,18 +29,23 @@ import (
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
-	redisSession "github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
 	_ "net/http/pprof"
 )
 
-//go:embed web/dist
+//go:embed web/default/dist
 var buildFS embed.FS
 
-//go:embed web/dist/index.html
+//go:embed web/default/dist/index.html
 var indexPage []byte
+
+//go:embed web/classic/dist
+var classicBuildFS embed.FS
+
+//go:embed web/classic/dist/index.html
+var classicIndexPage []byte
 
 func main() {
 	startTime := time.Now()
@@ -122,6 +128,9 @@ func main() {
 		return a
 	}
 
+	// Channel upstream model update check task
+	controller.StartChannelUpstreamModelUpdateTask()
+
 	if common.IsMasterNode && constant.UpdateTask {
 		gopool.Go(func() {
 			controller.UpdateMidjourneyTaskBulk()
@@ -138,7 +147,7 @@ func main() {
 
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		gopool.Go(func() {
-			log.Println(http.ListenAndServe("127.0.0.1:8005", nil))
+			log.Println(http.ListenAndServe("0.0.0.0:8005", nil))
 		})
 		go common.Monitor()
 		common.SysLog("pprof enabled")
@@ -166,48 +175,27 @@ func main() {
 	server.Use(middleware.PoweredBy())
 	server.Use(middleware.I18n())
 	middleware.SetUpLogger(server)
-	// Initialize session store: Redis (server-side) when available, cookie fallback for dev.
-	var store sessions.Store
-	if common.RedisEnabled {
-		opt := common.ParseRedisOption()
-		redisStore, err := redisSession.NewStoreWithDB(
-			10, "tcp", opt.Addr, opt.Password, strconv.Itoa(opt.DB),
-			[]byte(common.SessionSecret),
-		)
-		if err != nil {
-			common.FatalLog("failed to create Redis session store: " + err.Error())
-			return
-		}
-		redisStore.Options(sessions.Options{
-			Path:     "/",
-			MaxAge:   2592000, // 30 days
-			HttpOnly: true,
-			Secure:   false,
-			SameSite: http.SameSiteLaxMode,
-		})
-		store = redisStore
-		common.SysLog("Session store: Redis (" + opt.Addr + ")")
-	} else {
-		cookieStore := cookie.NewStore([]byte(common.SessionSecret))
-		cookieStore.Options(sessions.Options{
-			Path:     "/",
-			MaxAge:   2592000, // 30 days
-			HttpOnly: true,
-			Secure:   false,
-			SameSite: http.SameSiteLaxMode,
-		})
-		store = cookieStore
-		common.SysLog("Session store: Cookie (dev mode)")
-	}
-	// Use a distinct cookie name to avoid conflicts with stale "session" cookies
-	// from previous deployments (cookie-store format vs redistore format).
-	server.Use(sessions.Sessions("lurus-session", store))
+	// Initialize session store
+	store := cookie.NewStore([]byte(common.SessionSecret))
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   2592000, // 30 days
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteStrictMode,
+	})
+	server.Use(sessions.Sessions("session", store))
 
 	InjectUmamiAnalytics()
 	InjectGoogleAnalytics()
 
 	// 设置路由
-	router.SetRouter(server, buildFS, indexPage)
+	router.SetRouter(server, router.ThemeAssets{
+		DefaultBuildFS:   buildFS,
+		DefaultIndexPage: indexPage,
+		ClassicBuildFS:   classicBuildFS,
+		ClassicIndexPage: classicIndexPage,
+	})
 	var port = os.Getenv("PORT")
 	if port == "" {
 		port = strconv.Itoa(*common.Port)
@@ -237,8 +225,10 @@ func InjectUmamiAnalytics() {
 		analyticsInjectBuilder.WriteString("\"></script>")
 	}
 	analyticsInjectBuilder.WriteString("<!--Umami QuantumNous-->\n")
-	analyticsInject := analyticsInjectBuilder.String()
-	indexPage = bytes.ReplaceAll(indexPage, []byte("<!--umami-->\n"), []byte(analyticsInject))
+	analyticsInject := []byte(analyticsInjectBuilder.String())
+	placeholder := []byte("<!--umami-->\n")
+	indexPage = bytes.ReplaceAll(indexPage, placeholder, analyticsInject)
+	classicIndexPage = bytes.ReplaceAll(classicIndexPage, placeholder, analyticsInject)
 }
 
 func InjectGoogleAnalytics() {
@@ -259,8 +249,10 @@ func InjectGoogleAnalytics() {
 		analyticsInjectBuilder.WriteString("</script>")
 	}
 	analyticsInjectBuilder.WriteString("<!--Google Analytics QuantumNous-->\n")
-	analyticsInject := analyticsInjectBuilder.String()
-	indexPage = bytes.ReplaceAll(indexPage, []byte("<!--Google Analytics-->\n"), []byte(analyticsInject))
+	analyticsInject := []byte(analyticsInjectBuilder.String())
+	placeholder := []byte("<!--Google Analytics-->\n")
+	indexPage = bytes.ReplaceAll(indexPage, placeholder, analyticsInject)
+	classicIndexPage = bytes.ReplaceAll(classicIndexPage, placeholder, analyticsInject)
 }
 
 func InitResources() error {
@@ -315,12 +307,7 @@ func InitResources() error {
 		return err
 	}
 
-	// Initialize NATS event publisher (no-op if NATS_URL unset).
-	// Failure to connect is logged but not fatal: missing NATS only disables
-	// the unified inbox feature; core LLM relay must still function.
-	if err := service.InitNATSPublisher(); err != nil {
-		common.SysError("failed to initialize NATS publisher: " + err.Error())
-	}
+	perfmetrics.Init()
 
 	// 启动系统监控
 	common.StartSystemMonitor()

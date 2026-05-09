@@ -1,7 +1,6 @@
 package gemini
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +17,7 @@ import (
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/samber/lo"
 )
 
 type Adaptor struct {
@@ -53,15 +53,13 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayIn
 }
 
 func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
-	if info.RelayMode == constant.RelayModeAudioSpeech {
-		return ConvertAudioRequestToGemini(request)
-	}
-	return nil, errors.New("gemini adapter only supports TTS (audio speech), not transcription")
+	//TODO implement me
+	return nil, errors.New("not implemented")
 }
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
 	if !strings.HasPrefix(info.UpstreamModelName, "imagen") {
-		return nil, errors.New("not supported model for image generation")
+		return nil, errors.New("not supported model for image generation, only imagen models are supported")
 	}
 
 	// convert size to aspect ratio but allow user to specify aspect ratio
@@ -87,22 +85,14 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 	}
 
 	// build gemini imagen request
-	instance := dto.GeminiImageInstance{
-		Prompt: request.Prompt,
-	}
-	// Handle image-to-image: pass reference image if provided
-	if len(request.Image) > 0 {
-		var imageB64 string
-		if err := json.Unmarshal(request.Image, &imageB64); err == nil && imageB64 != "" {
-			instance.Image = &dto.GeminiImageData{
-				BytesBase64Encoded: imageB64,
-			}
-		}
-	}
 	geminiRequest := dto.GeminiImageRequest{
-		Instances:  []dto.GeminiImageInstance{instance},
+		Instances: []dto.GeminiImageInstance{
+			{
+				Prompt: request.Prompt,
+			},
+		},
 		Parameters: dto.GeminiImageParameters{
-			SampleCount:      int(request.N),
+			SampleCount:      int(lo.FromPtrOr(request.N, uint(1))),
 			AspectRatio:      aspectRatio,
 			PersonGeneration: "allow_adult", // default allow adult
 		},
@@ -158,11 +148,6 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 
 	if strings.HasPrefix(info.UpstreamModelName, "imagen") {
 		return fmt.Sprintf("%s/%s/models/%s:predict", info.ChannelBaseUrl, version, info.UpstreamModelName), nil
-	}
-
-	// TTS models use generateContent with audio output modality
-	if info.RelayMode == constant.RelayModeAudioSpeech {
-		return fmt.Sprintf("%s/%s/models/%s:generateContent", info.ChannelBaseUrl, version, info.UpstreamModelName), nil
 	}
 
 	if strings.HasPrefix(info.UpstreamModelName, "text-embedding") ||
@@ -239,8 +224,9 @@ func (a *Adaptor) ConvertEmbeddingRequest(c *gin.Context, info *relaycommon.Rela
 		switch info.UpstreamModelName {
 		case "text-embedding-004", "gemini-embedding-exp-03-07", "gemini-embedding-001":
 			// Only newer models introduced after 2024 support OutputDimensionality
-			if request.Dimensions > 0 {
-				geminiRequest["outputDimensionality"] = request.Dimensions
+			dimensions := lo.FromPtrOr(request.Dimensions, 0)
+			if dimensions > 0 {
+				geminiRequest["outputDimensionality"] = dimensions
 			}
 		}
 		geminiRequests = append(geminiRequests, geminiRequest)
@@ -275,10 +261,6 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 
 	if strings.HasPrefix(info.UpstreamModelName, "imagen") {
 		return GeminiImageHandler(c, info, resp)
-	}
-
-	if info.RelayMode == constant.RelayModeAudioSpeech {
-		return GeminiTTSHandler(c, info, resp)
 	}
 
 	// check if the model is an embedding model

@@ -23,16 +23,6 @@ import (
 func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
 	info.InitChannelMeta(c)
 
-	// Tee response bytes through a capped buffer so we can extract the upstream
-	// image URL after adaptors stream their JSON back to the client. The bytes
-	// the user sees remain byte-identical; only an in-memory mirror (≤64 KiB)
-	// is retained for post-flight parsing. Restored on return so we never
-	// leave a wrapped writer on c if a later middleware also writes.
-	captured := service.NewBufferedResponseWriter(c.Writer, service.CapturedBodyMaxBytes)
-	originalWriter := c.Writer
-	c.Writer = captured
-	defer func() { c.Writer = originalWriter }()
-
 	imageReq, ok := info.Request.(*dto.ImageRequest)
 	if !ok {
 		return types.NewErrorWithStatusCode(fmt.Errorf("invalid request type, expected dto.ImageRequest, got %T", info.Request), types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
@@ -80,9 +70,9 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 
 			// apply param override
 			if len(info.ParamOverride) > 0 {
-				jsonData, err = relaycommon.ApplyParamOverride(jsonData, info.ParamOverride, relaycommon.BuildParamOverrideContext(info))
+				jsonData, err = relaycommon.ApplyParamOverrideWithRelayInfo(jsonData, info)
 				if err != nil {
-					return types.NewError(err, types.ErrorCodeChannelParamOverrideInvalid, types.ErrOptionWithSkipRetry())
+					return newAPIErrorFromParamOverride(err)
 				}
 			}
 
@@ -123,11 +113,26 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 		return newAPIError
 	}
 
+	imageN := uint(1)
+	if request.N != nil {
+		imageN = *request.N
+	}
+
+	// n is handled via OtherRatio so it is applied exactly once in quota
+	// calculation (both price-based and ratio-based paths).
+	// Adaptors may have already set a more accurate count from the
+	// upstream response; only set the default when they haven't.
+	if info.PriceData.UsePrice { // only price model use N ratio
+		if _, hasN := info.PriceData.OtherRatios["n"]; !hasN {
+			info.PriceData.AddOtherRatio("n", float64(imageN))
+		}
+	}
+
 	if usage.(*dto.Usage).TotalTokens == 0 {
-		usage.(*dto.Usage).TotalTokens = int(request.N)
+		usage.(*dto.Usage).TotalTokens = 1
 	}
 	if usage.(*dto.Usage).PromptTokens == 0 {
-		usage.(*dto.Usage).PromptTokens = int(request.N)
+		usage.(*dto.Usage).PromptTokens = 1
 	}
 
 	quality := "standard"
@@ -143,20 +148,10 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	if len(quality) > 0 {
 		logContent = append(logContent, fmt.Sprintf("品质 %s", quality))
 	}
-	if request.N > 0 {
-		logContent = append(logContent, fmt.Sprintf("生成数量 %d", request.N))
+	if imageN > 0 {
+		logContent = append(logContent, fmt.Sprintf("生成数量 %d", imageN))
 	}
 
-	postConsumeQuota(c, info, usage.(*dto.Usage), logContent...)
-
-	// Notify the platform unified inbox that an image generation finished.
-	// Fire-and-forget: we do not surface NATS errors to the user. ImageURL is
-	// extracted from the captured response body — adaptors normalize provider
-	// output to OpenAI-shape `{"data":[{"url":...}]}` before writing, so the
-	// extractor finds the URL for OpenAI/DALL-E, Replicate, Ali, Jimeng,
-	// Gemini, and Zhipu uniformly. On parse miss / cap-truncated body the
-	// URL is "" and the consumer falls back to prompt+model rendering.
-	imageURL := service.ExtractImageURL(captured.Bytes())
-	service.PublishImageGenerated(c.Request.Context(), info.UserId, info.OriginModelName, request.Prompt, imageURL)
+	service.PostTextConsumeQuota(c, info, usage.(*dto.Usage), logContent)
 	return nil
 }

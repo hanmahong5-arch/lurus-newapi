@@ -25,9 +25,11 @@ var defaultGeminiSettings = GeminiSettings{
 		"gemini-1.0-pro": "v1",
 	},
 	SupportedImagineModels: []string{
-		"gemini-3.1-flash-image-preview", // Nano Banana 2
 		"gemini-2.0-flash-exp-image-generation",
 		"gemini-2.0-flash-exp",
+		"gemini-3-pro-image-preview",
+		"gemini-2.5-flash-image",
+		"gemini-3.1-flash-image-preview",
 	},
 	ThinkingAdapterEnabled:                false,
 	ThinkingAdapterBudgetTokensPercentage: 0.6,

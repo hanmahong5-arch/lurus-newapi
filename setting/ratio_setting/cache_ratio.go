@@ -8,8 +8,6 @@ var defaultCacheRatio = map[string]float64{
 	"gemini-3-flash-preview":              0.1,
 	"gemini-3-pro-preview":                0.1,
 	"gemini-3.1-pro-preview":              0.1,
-	"gemini-3.1-flash-lite-preview":       0.1,
-	"gemini-3.1-flash-image-preview":      0.1,
 	"gpt-4":                               0.5,
 	"o1":                                  0.5,
 	"o1-2024-12-17":                       0.5,
@@ -66,6 +64,13 @@ var defaultCacheRatio = map[string]float64{
 	"claude-opus-4-6-high":                0.1,
 	"claude-opus-4-6-medium":              0.1,
 	"claude-opus-4-6-low":                 0.1,
+	"claude-opus-4-7":                     0.1,
+	"claude-opus-4-7-thinking":            0.1,
+	"claude-opus-4-7-max":                 0.1,
+	"claude-opus-4-7-xhigh":               0.1,
+	"claude-opus-4-7-high":                0.1,
+	"claude-opus-4-7-medium":              0.1,
+	"claude-opus-4-7-low":                 0.1,
 }
 
 var defaultCreateCacheRatio = map[string]float64{
@@ -94,6 +99,13 @@ var defaultCreateCacheRatio = map[string]float64{
 	"claude-opus-4-6-high":                1.25,
 	"claude-opus-4-6-medium":              1.25,
 	"claude-opus-4-6-low":                 1.25,
+	"claude-opus-4-7":                     1.25,
+	"claude-opus-4-7-thinking":            1.25,
+	"claude-opus-4-7-max":                 1.25,
+	"claude-opus-4-7-xhigh":               1.25,
+	"claude-opus-4-7-high":                1.25,
+	"claude-opus-4-7-medium":              1.25,
+	"claude-opus-4-7-low":                 1.25,
 }
 
 //var defaultCreateCacheRatio = map[string]float64{}
