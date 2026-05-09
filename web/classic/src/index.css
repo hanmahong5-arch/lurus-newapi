@@ -1,3 +1,20 @@
+/* ==================== LurusTech Brand Tokens ==================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --lt-paper: #F5F2E8;
+  --lt-bg:    #E8E4D6;
+  --lt-ink:   #14130F;
+  --lt-rule:  #D6D2C2;
+  --lt-accent: #FF5D1F;
+  --lt-ok:    #1F7A4F;
+  --lt-warn:  #B8821F;
+  --lt-err:   #B3392B;
+  --lt-info:  #2D4A8A;
+  --font-sans: 'Inter Tight', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
 /* ==================== Tailwind CSS 配置 ==================== */
 @layer tailwind-base, semi, tailwind-components, tailwind-utils;
 

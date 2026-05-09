@@ -191,7 +191,7 @@ const FooterBar = () => {
         <div className='flex flex-col md:flex-row items-center justify-between w-full max-w-[1110px] gap-6'>
           <div className='flex flex-wrap items-center gap-2'>
             <Typography.Text className='text-sm !text-semi-color-text-1'>
-              © {currentYear} {systemName}. {t('版权所有')}
+              © {currentYear} LurusTech. Built on New API · AGPL-3.0
             </Typography.Text>
           </div>
 
@@ -229,7 +229,7 @@ const FooterBar = () => {
             ></div>
             <div className='text-sm flex-shrink-0'>
               <span className='!text-semi-color-text-1'>
-                {t('设计与开发由')}{' '}
+                © {currentYear} LurusTech. Built on{' '}
               </span>
               <a
                 href='https://github.com/QuantumNous/new-api'
@@ -239,6 +239,7 @@ const FooterBar = () => {
               >
                 New API
               </a>
+              <span className='!text-semi-color-text-1'> · AGPL-3.0</span>
             </div>
           </div>
         </footer>
