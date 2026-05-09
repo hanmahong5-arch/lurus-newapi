@@ -48,7 +48,9 @@ func ConvertNativeImageRequest(request dto.ImageRequest) (any, error) {
 			Parts: parts,
 		}},
 		GenerationConfig: dto.GeminiChatGenerationConfig{
-			ResponseModalities: []string{"IMAGE"},
+			// Gemini multimodal image-gen models require BOTH modalities;
+			// IMAGE alone is rejected and the model falls back to text only.
+			ResponseModalities: []string{"TEXT", "IMAGE"},
 		},
 	}
 
@@ -75,22 +77,33 @@ func GeminiNativeImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp 
 		Data:    make([]dto.ImageData, 0),
 	}
 
+	var textFallback strings.Builder
+
 	for _, candidate := range geminiResp.Candidates {
 		for _, part := range candidate.Content.Parts {
-			if part.InlineData == nil || part.InlineData.Data == "" {
+			if part.InlineData != nil && part.InlineData.Data != "" &&
+				strings.HasPrefix(part.InlineData.MimeType, "image/") {
+				openAIResp.Data = append(openAIResp.Data, dto.ImageData{
+					B64Json: part.InlineData.Data,
+				})
 				continue
 			}
-			if !strings.HasPrefix(part.InlineData.MimeType, "image/") {
-				continue
+			if part.Text != "" {
+				if textFallback.Len() > 0 {
+					textFallback.WriteString(" ")
+				}
+				textFallback.WriteString(part.Text)
 			}
-			openAIResp.Data = append(openAIResp.Data, dto.ImageData{
-				B64Json: part.InlineData.Data,
-			})
 		}
 	}
 
 	if len(openAIResp.Data) == 0 {
-		return nil, types.NewOpenAIError(errors.New("no images generated"), types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		// Surface model's textual refusal/explanation so callers can act on it.
+		msg := "no images generated"
+		if t := strings.TrimSpace(textFallback.String()); t != "" {
+			msg = "no images generated: " + t
+		}
+		return nil, types.NewOpenAIError(errors.New(msg), types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
 
 	respBytes, marshalErr := common.Marshal(openAIResp)
