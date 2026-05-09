@@ -58,8 +58,11 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 }
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
+	if IsGeminiNativeImageModel(info.UpstreamModelName) {
+		return ConvertNativeImageRequest(request)
+	}
 	if !strings.HasPrefix(info.UpstreamModelName, "imagen") {
-		return nil, errors.New("not supported model for image generation, only imagen models are supported")
+		return nil, errors.New("not supported model for image generation, only imagen-* and gemini-*-image / nano-banana-* models are supported")
 	}
 
 	// convert size to aspect ratio but allow user to specify aspect ratio
@@ -261,6 +264,13 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 
 	if strings.HasPrefix(info.UpstreamModelName, "imagen") {
 		return GeminiImageHandler(c, info, resp)
+	}
+
+	// Native Gemini multimodal image generation (Nano Banana / gemini-*-image-*):
+	// only when the request is /v1/images/generations (RelayMode = ImagesGenerations).
+	// Chat completions with inline image output go through the regular chat handler.
+	if info.RelayMode == constant.RelayModeImagesGenerations && IsGeminiNativeImageModel(info.UpstreamModelName) {
+		return GeminiNativeImageHandler(c, info, resp)
 	}
 
 	// check if the model is an embedding model
