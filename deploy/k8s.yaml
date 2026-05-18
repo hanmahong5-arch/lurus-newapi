@@ -113,13 +113,15 @@ spec:
         fsGroup: 65534
       containers:
         - name: lurus-newapi
-          # Custom build = upstream QuantumNous/new-api v1.0.0-rc.4 + 1 patch:
-          # supports gemini-*-image-* / nano-banana-* via /v1/images/generations
-          # by routing them through generateContent with responseModalities=IMAGE.
-          # Source: relay/channel/gemini/native_image.go (commit d7f6e9f).
-          # Rollback to vanilla upstream: image: calciumion/new-api:v1.0.0-rc.4
-          # Rollback to pre-v1.0 fork:    image: ghcr.io/hanmahong5-arch/lurus-newapi:main-fc49e72
-          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-d7f6e9f
+          # Custom build = upstream QuantumNous/new-api v1.0.0-rc.4 + 2 patches:
+          # (1) gemini-*-image-* / nano-banana-* via /v1/images/generations
+          #     (relay/channel/gemini/native_image.go, commit d7f6e9f)
+          # (2) session cookie SameSite=Lax + Secure=true so reload doesn't
+          #     drop the session (main.go, commit 84c1d88)
+          # Rollback to last known-bad cookie config: image: ghcr.io/hanmahong5-arch/lurus-newapi:main-d7f6e9f
+          # Rollback to vanilla upstream:             image: calciumion/new-api:v1.0.0-rc.4
+          # Rollback to pre-v1.0 fork:                image: ghcr.io/hanmahong5-arch/lurus-newapi:main-fc49e72
+          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-84c1d88
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
