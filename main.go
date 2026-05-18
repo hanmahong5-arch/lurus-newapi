@@ -181,8 +181,12 @@ func main() {
 		Path:     "/",
 		MaxAge:   2592000, // 30 days
 		HttpOnly: true,
-		Secure:   false,
-		SameSite: http.SameSiteStrictMode,
+		// Upstream defaults (Secure:false / SameSite:Strict) drop the session cookie
+		// on page refresh, link-in navigation, and cross-tab opens — every reload
+		// renders as "expired" until the user wipes browser data. Lax + Secure is the
+		// standard webapp profile and is safe behind HTTPS.
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
 	})
 	server.Use(sessions.Sessions("session", store))
 
