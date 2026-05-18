@@ -188,7 +188,14 @@ func main() {
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	server.Use(sessions.Sessions("session", store))
+	// Cookie name "session" is too generic — across the Lurus subdomain stack
+	// (newhub/identity/etc., all share the same generic name), historical
+	// deploys with different Path/Domain attributes leave multiple cookies
+	// with the same name in the browser. The Go stdlib reads the FIRST match,
+	// which is the stale one, and the user sees 401 on every page until they
+	// hand-clear the cookie store. Naming it newapi_session makes the cookie
+	// unique to this service so residual generic "session" cookies are inert.
+	server.Use(sessions.Sessions("newapi_session", store))
 
 	InjectUmamiAnalytics()
 	InjectGoogleAnalytics()
