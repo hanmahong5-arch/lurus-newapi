@@ -244,7 +244,32 @@ spec:
   type: ClusterIP
 
 ---
+# Middleware: residual auth state cleanup on /login
+# Background: after 2026-05-08 switch from local fork to vanilla upstream image,
+# browsers retain old `lurus-session` cookie (fork-era name) + stale
+# `localStorage.user` (set by the SPA before logout). On reload the SPA reads
+# localStorage as "logged in", fires probe requests (/api/status, /api/user/self,
+# /api/notification), each returns 401, and helpers/utils.jsx redirects to
+# /login?expired=true — once per concurrent 401. The user sees the toast every
+# time until they clear browser data.
+# Fix: on every response from /login, force-expire the stale cookie and forbid
+# SPA-bundle caching, so the first visit after this rolls out scrubs residual
+# state for all clients.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: newapi-login-cleanup
+  namespace: lurus-system
+spec:
+  headers:
+    customResponseHeaders:
+      Set-Cookie: "lurus-session=; Max-Age=0; Path=/; Domain=.lurus.cn"
+      Cache-Control: "no-store"
+
+---
 # IngressRoute for Traefik
+# Two rules: /login gets cookie-cleanup middleware, everything else stays as-is.
+# Traefik picks the longer-path matcher first, so /login traffic hits rule 1.
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -256,6 +281,16 @@ spec:
   entryPoints:
     - websecure
   routes:
+    - match: Host(`newapi.lurus.cn`) && PathPrefix(`/login`)
+      kind: Rule
+      middlewares:
+        - name: global-ratelimit
+          namespace: lurus-system
+        - name: newapi-login-cleanup
+          namespace: lurus-system
+      services:
+        - name: lurus-newapi
+          port: 3000
     - match: Host(`newapi.lurus.cn`)
       kind: Rule
       middlewares:
