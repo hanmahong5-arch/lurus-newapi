@@ -287,10 +287,15 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
 
           const other = parseLogOther(log.other)
           const affinity = other?.admin_info?.channel_affinity
+          const retryChain = other?.retry_chain
           const useChannel = other?.admin_info?.use_channel
+          const chainEntries: string[] | undefined =
+            retryChain && retryChain.length > 0
+              ? retryChain
+              : useChannel?.map(String)
           const channelChain =
-            useChannel && useChannel.length > 0
-              ? useChannel.join(' → ')
+            chainEntries && chainEntries.length > 0
+              ? chainEntries.join(' → ')
               : undefined
           const channelDisplay = log.channel_name
             ? `${log.channel_name} #${log.channel}`

@@ -196,7 +196,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			break
 		}
 
-		addUsedChannel(c, channel.Id)
+		addUsedChannel(c, channel.Id, channel.Name)
 		bodyStorage, bodyErr := common.GetBodyStorage(c)
 		if bodyErr != nil {
 			// Ensure consistent 413 for oversized bodies even when error occurs later (e.g., retry path)
@@ -254,10 +254,20 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func addUsedChannel(c *gin.Context, channelId int) {
+func addUsedChannel(c *gin.Context, channelId int, channelName string) {
 	useChannel := c.GetStringSlice("use_channel")
 	useChannel = append(useChannel, fmt.Sprintf("%d", channelId))
 	c.Set("use_channel", useChannel)
+
+	useChannelNames := c.GetStringSlice("use_channel_names")
+	var label string
+	if channelName == "" {
+		label = fmt.Sprintf("#%d", channelId)
+	} else {
+		label = fmt.Sprintf("%s #%d", channelName, channelId)
+	}
+	useChannelNames = append(useChannelNames, label)
+	c.Set("use_channel_names", useChannelNames)
 }
 
 func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
@@ -381,6 +391,13 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		other["channel_id"] = channelId
 		other["channel_name"] = c.GetString("channel_name")
 		other["channel_type"] = c.GetInt("channel_type")
+		// Promote retry chain to top-level so non-admin users see which channels
+		// were tried before the error surfaced. admin_info.use_channel keeps the
+		// raw ID list for backwards compat with the admin view.
+		if names := c.GetStringSlice("use_channel_names"); len(names) > 0 {
+			other["retry_chain"] = names
+			other["retry_count"] = len(names) - 1
+		}
 		adminInfo := make(map[string]interface{})
 		adminInfo["use_channel"] = c.GetStringSlice("use_channel")
 		isMultiKey := common.GetContextKeyBool(c, constant.ContextKeyChannelIsMultiKey)
@@ -534,7 +551,7 @@ func RelayTask(c *gin.Context) {
 			}
 		}
 
-		addUsedChannel(c, channel.Id)
+		addUsedChannel(c, channel.Id, channel.Name)
 		bodyStorage, bodyErr := common.GetBodyStorage(c)
 		if bodyErr != nil {
 			if common.IsRequestBodyTooLargeError(bodyErr) || errors.Is(bodyErr, common.ErrRequestBodyTooLarge) {

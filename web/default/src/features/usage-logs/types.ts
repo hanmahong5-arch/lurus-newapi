@@ -93,6 +93,8 @@ export interface LogOtherData {
   }
   request_path?: string
   request_conversion?: string[]
+  retry_chain?: string[]
+  retry_count?: number
   ws?: boolean
   audio?: boolean
   audio_input?: number
