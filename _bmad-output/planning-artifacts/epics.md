@@ -61,11 +61,16 @@
 
 | Story | Title | Priority | Status | 来源 |
 |-------|-------|----------|--------|------|
-| 1-1 | Token 详情页加调用代码卡片（curl/Python/TS）| P0 | backlog | Portkey/Helicone |
-| 1-2 | 错误日志增强：channel + key 脱敏 + retry 链 | P0 | backlog | LiteLLM/Helicone |
-| 1-3 | 首页加"最近 1 小时"健康摘要 banner（调用数/错误率/TTFT/top model）| P1 | backlog | Helicone Dashboard |
+| 1-1 | Token 详情页加调用代码卡片（curl/Python/TS/Go）| P0 | ✅ shipped (image main-90a1e72) | Portkey/Helicone |
+| 1-2 | 错误日志增强：retry chain 含 channel name 对普通用户可见 | P0 | ✅ shipped (commit 90a1e72) | LiteLLM/Helicone |
+| 1-3 | 首页加"最近 1 小时"健康摘要 banner | P1 | ⏭️ deferred → E5 | Helicone Dashboard |
 
-**实施成本**: 全部 S（纯前端 + 日志字段扩展），单人 1 周可全部交付。
+**1-3 关闭理由**: 现有 `OverviewDashboard` 已含 SummaryCards（balance/usage/requests + 1h sparkline）、SetupGuide（含 curl 示例）、ApiInfoPanel、UptimePanel。缺的 error rate / TTFT / top model 需要后端聚合 API，超出"一周快赢"，归并到 E5。
+
+**1-2 实施细节**:
+ - `controller/relay.go`: `addUsedChannel` 加 channelName 参数；`processChannelError` 写入顶级 `other.retry_chain` (`["Volcengine #1", "OpenAI-backup #2"]` 格式) + `retry_count`
+ - `model/log.go formatUserLogs` 默认保留顶级字段，无需改
+ - `web/default/.../common-logs-columns.tsx`: 优先读 `retry_chain`，fallback `admin_info.use_channel` 向后兼容旧记录
 
 ---
 
