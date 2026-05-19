@@ -7,6 +7,7 @@ import {
   PowerOff,
   ExternalLink,
   ArrowRightLeft,
+  Code2,
   Copy,
   Link,
   Loader2,
@@ -236,6 +237,20 @@ export function DataTableRowActions<TData>({
             {t('Edit')}
             <DropdownMenuShortcut>
               <Edit size={16} />
+            </DropdownMenuShortcut>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={async () => {
+              const realKey = await resolveRealKey(apiKey.id)
+              if (!realKey) return
+              setResolvedKey(realKey)
+              setCurrentRow(apiKey)
+              setOpen('usage-snippet')
+            }}
+          >
+            {t('Code Snippets')}
+            <DropdownMenuShortcut>
+              <Code2 size={16} />
             </DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem
