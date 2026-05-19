@@ -113,7 +113,7 @@ spec:
         fsGroup: 65534
       containers:
         - name: lurus-newapi
-          # Custom build = upstream QuantumNous/new-api v1.0.0-rc.4 + 3 patches:
+          # Custom build = upstream QuantumNous/new-api v1.0.0-rc.4 + 5 patches:
           # (1) gemini-*-image-* / nano-banana-* via /v1/images/generations
           #     (relay/channel/gemini/native_image.go, commit d7f6e9f)
           # (2) session cookie SameSite=Lax + Secure=true so reload doesn't
@@ -121,10 +121,15 @@ spec:
           # (3) rename session cookie name session -> newapi_session to avoid
           #     duplicate-cookie collision across Lurus subdomains and stale
           #     fork-era cookies (main.go, commit 223e721)
+          # (4) API call snippets dialog (curl/Python/TS/Go) on token row
+          #     (web/default/.../usage-snippet-dialog.tsx, commit d953884)
+          # (5) expose retry chain with channel names to non-admin log view
+          #     (controller/relay.go + usage-logs columns, commit 90a1e72)
+          # Rollback to pre-E1 quickwins: image: ghcr.io/hanmahong5-arch/lurus-newapi:main-223e721
           # Rollback to pre-rename:        image: ghcr.io/hanmahong5-arch/lurus-newapi:main-84c1d88
           # Rollback to vanilla upstream:  image: calciumion/new-api:v1.0.0-rc.4
           # Rollback to pre-v1.0 fork:     image: ghcr.io/hanmahong5-arch/lurus-newapi:main-fc49e72
-          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-223e721
+          image: ghcr.io/hanmahong5-arch/lurus-newapi:main-90a1e72
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
